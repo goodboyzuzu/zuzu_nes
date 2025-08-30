@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include "unity.h"
 
-#include "test_bus.c"
-#include "test_cpu.c"
+#include "test_bus.h"
+#include "test_cpu.h"
+
+void setUp(void){};
+void tearDown(void){};
 
 int main(void) {
     UNITY_BEGIN();

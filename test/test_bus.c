@@ -1,6 +1,4 @@
-#include "unity.h"
-#include "Bus.h"
-#include "CPU.h"
+#include "test_bus.h"
 
 static Bus* bus = NULL;
 
@@ -12,11 +10,6 @@ void bus_global_teardown(void) {
     Bus_destroy(&bus);
 }
 
-void setUp(void) {
-}
-
-void tearDown(void) {
-}
 
 void test_Bus_initial_state(void) {
     TEST_ASSERT_EACH_EQUAL_UINT8(0, bus->ram, 2048);

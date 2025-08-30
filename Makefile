@@ -6,7 +6,6 @@ else
 endif
 CFLAGS = -Wall -std=c89
 
-INCLUDE_PATH = -Iinclude
 
 all:
 	$(CC) $(CFLAGS) -Iinclude -o nes_emulator src/main.c src/Bus.c src/CPU.c
@@ -14,5 +13,5 @@ all:
 
 
 test_runner:
-	$(CC) $(CFLAGS) -Iinclude -Itest -o test_output test/test_runner.c test/unity.c src/Bus.c src/CPU.c
+	$(CC) $(CFLAGS) -Iinclude -Itest -o test_output test/test_runner.c test/test_bus.c test/test_cpu.c test/unity.c src/Bus.c src/CPU.c
 	./test_output

@@ -1,27 +1,26 @@
 #include "Bus.h"
 #include <stdlib.h>
 
+/* forward declaration of CPU related function */
+CPU* CPU_init(Bus* bus);
+void CPU_connect_Bus(CPU* cpu, Bus* bus);
+void CPU_destroy(CPU** cpu);
+
 Bus* Bus_init() {
     Bus* bus = malloc(sizeof(Bus));
-    if (bus) {
-        /* Initialize fields if needed */
-        printf("Bus_init called\n");
-        /* print size of bus */
-        printf("Size of Bus: %zu bytes\n", sizeof(Bus));
-        /* memory address of bus pointer */
-        printf("Bus pointer address: %p\n", (void*)bus);
-    }
+    printf("Bus initialized\n");
+    bus->cpu = CPU_init(bus);
+    CPU_connect_Bus(bus->cpu, bus);
     return bus;
 }
 
 void Bus_destroy(Bus** bus){
     if (bus && *bus) {
-        printf("Bus_destroy called\n");
         free(*bus);
-        printf("Bus pointer after free: %p\n", (void*)(*bus));
         *bus = NULL;
-        printf("Bus pointer after setting to NULL: %p\n", (void*)(*bus));
+        printf("Bus destroyed\n");
     }
+    CPU_destroy(&((*bus)->cpu));
 }
 
 void Bus_write(Bus* bus, uint16_t addr, uint8_t data){

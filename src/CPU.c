@@ -47,12 +47,21 @@ CPU* CPU_init(){
 }
 void CPU_destroy(CPU** cpu){
     if (cpu && *cpu) {
-        printf("CPU_destroy called\n");
         free((*cpu)->lookup_table);
         free(*cpu);
         *cpu = NULL;
-        printf("CPU pointer after setting to NULL: %p\n", (void*)(*cpu));
+        printf("CPU_destroy called\n");
     }
 }
 
+void CPU_connect_Bus(CPU* cpu, Bus* bus){
+    cpu->bus = bus;
+}
 
+uint8_t CPU_read(CPU* cpu, uint16_t a){
+    return Bus_read(cpu->bus, a, false);
+}
+
+void CPU_write(CPU* cpu, uint16_t a, uint8_t d){
+    Bus_write(cpu->bus, a, d);
+}

@@ -1,12 +1,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "CPU.h"
 
 #ifndef BUS_H
 #define BUS_H
-typedef struct {
-    CPU cpu;
+
+typedef struct CPU CPU;
+
+typedef struct Bus{
+    CPU* cpu;
     /* 64KB RAM */
     uint8_t ram[64*1024];
 } Bus;

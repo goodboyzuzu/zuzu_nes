@@ -65,3 +65,10 @@ uint8_t CPU_read(CPU* cpu, uint16_t a){
 void CPU_write(CPU* cpu, uint16_t a, uint8_t d){
     Bus_write(cpu->bus, a, d);
 }
+
+uint8_t fetch(CPU* cpu){
+    if (!(cpu->lookup_table[cpu->opcode].addrmode == &IMP)){
+        cpu->fetched = CPU_read(cpu, cpu->addr_abs);
+    }
+    return cpu->fetched;
+}

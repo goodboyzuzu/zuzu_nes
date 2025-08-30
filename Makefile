@@ -1,12 +1,18 @@
 # c compiler and flag. if is mac os, use clang else gcc
-ifeq($(shell uname), Darwin)
+ifeq ($(shell uname), Darwin)
 	CC = clang
 else
 	CC = gcc
-CFLAGS = -Wall -Wextra -std=c89
+endif
+CFLAGS = -Wall -std=c99
 
-INCLUDE_PATH = -Iinc
+INCLUDE_PATH = -Iinclude
 
-all: nes_emulator
-nes_emulator: src/main.c src/Bus.c src/CPU.c 
-	$(CC) $(CFLAGS) $(INCLUDE_PATH) -o nes_emulator src/main.c src/Bus.c src/CPU.c
+all:
+	$(CC) $(CFLAGS) -Iinclude -o nes_emulator src/main.c src/Bus.c src/CPU.c
+	./nes_emulator
+
+
+test_runner:
+	$(CC) $(CFLAGS) -Iinclude -Itest -o test_output test/test_runner.c test/unity.c src/Bus.c src/CPU.c
+	./test_output

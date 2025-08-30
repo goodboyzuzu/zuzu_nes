@@ -1,11 +1,10 @@
 #include "Bus.h"
+#include "CPU.h"
+#include <stdio.h>
 
 int main()
 {
-    Bus bus;
-    CPU cpu;
-    Bus_init(&bus);
+    Bus* bus = Bus_init();
     Bus_destroy(&bus);
-    CPU_init(&cpu);
-    CPU_destroy(&cpu);
+    return 0;
 }

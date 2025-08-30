@@ -19,7 +19,6 @@ void tearDown(void) {
 }
 
 void test_Bus_initial_state(void) {
-    // Check that RAM is zeroed
     TEST_ASSERT_EACH_EQUAL_UINT8(0, bus->ram, 2048);
 }
 
@@ -32,7 +31,7 @@ void test_Bus_write_and_read_ram(void) {
 }
 
 
-// test runner interface
+/* test runner interface */
 void test_bus_run_all_tests(void) {
     bus_global_setup();
     RUN_TEST(test_Bus_initial_state);

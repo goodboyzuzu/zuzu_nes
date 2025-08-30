@@ -4,7 +4,7 @@ ifeq ($(shell uname), Darwin)
 else
 	CC = gcc
 endif
-CFLAGS = -Wall -std=c99
+CFLAGS = -Wall -std=c89
 
 INCLUDE_PATH = -Iinclude
 

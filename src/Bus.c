@@ -4,11 +4,11 @@
 Bus* Bus_init() {
     Bus* bus = malloc(sizeof(Bus));
     if (bus) {
-        // Initialize fields if needed
+        /* Initialize fields if needed */
         printf("Bus_init called\n");
-        //print size of bus
+        /* print size of bus */
         printf("Size of Bus: %zu bytes\n", sizeof(Bus));
-        // memory address of bus pointer
+        /* memory address of bus pointer */
         printf("Bus pointer address: %p\n", (void*)bus);
     }
     return bus;

@@ -11,7 +11,7 @@ uint8_t IMP(CPU* cpu) {
     return 0; 
 }
 
-static const INSTRUCTION instruction_set[] = {{"zuzu",&ADC,&IMP,2}};
+static const INSTRUCTION instruction_set[] = {{"zuzu_instruction",&ADC,&IMP,2}};
 /* static const INSTRUCTION instruction_set[] = {
         { "BRK", &BRK, &IMM, 7 },{ "ORA", &ORA, &IZX, 6 },{ "???", &XXX, &IMP, 2 },{ "???", &XXX, &IMP, 8 },{ "???", &NOP, &IMP, 3 },{ "ORA", &ORA, &ZP0, 3 },{ "ASL", &ASL, &ZP0, 5 },{ "???", &XXX, &IMP, 5 },{ "PHP", &PHP, &IMP, 3 },{ "ORA", &ORA, &IMM, 2 },{ "ASL", &ASL, &IMP, 2 },{ "???", &XXX, &IMP, 2 },{ "???", &NOP, &IMP, 4 },{ "ORA", &ORA, &ABS, 4 },{ "ASL", &ASL, &ABS, 6 },{ "???", &XXX, &IMP, 6 },
 		{ "BPL", &BPL, &REL, 2 },{ "ORA", &ORA, &IZY, 5 },{ "???", &XXX, &IMP, 2 },{ "???", &XXX, &IMP, 8 },{ "???", &NOP, &IMP, 4 },{ "ORA", &ORA, &ZPX, 4 },{ "ASL", &ASL, &ZPX, 6 },{ "???", &XXX, &IMP, 6 },{ "CLC", &CLC, &IMP, 2 },{ "ORA", &ORA, &ABY, 4 },{ "???", &NOP, &IMP, 2 },{ "???", &XXX, &IMP, 7 },{ "???", &NOP, &IMP, 4 },{ "ORA", &ORA, &ABX, 4 },{ "ASL", &ASL, &ABX, 7 },{ "???", &XXX, &IMP, 7 },
@@ -32,7 +32,7 @@ static const INSTRUCTION instruction_set[] = {{"zuzu",&ADC,&IMP,2}};
 }; */
 
 CPU* CPU_init(){
-    printf("CPU_init called\n");
+    debug_printf("CPU initialized;");
     CPU* cpu = malloc(sizeof(CPU));
     cpu->a = 0x00;
     cpu->x = 0x00;
@@ -49,8 +49,7 @@ void CPU_destroy(CPU** cpu){
     if (cpu && *cpu) {
         free((*cpu)->lookup_table);
         free(*cpu);
-        *cpu = NULL;
-        printf("CPU_destroy called\n");
+        debug_printf("CPU_destroyed;");
     }
 }
 
@@ -71,4 +70,103 @@ uint8_t fetch(CPU* cpu){
         cpu->fetched = CPU_read(cpu, cpu->addr_abs);
     }
     return cpu->fetched;
+}
+
+bool CPU_get_flag(CPU* cpu, enum CPU_FLAGS f) {
+    return ((cpu->status & f) > 0) ? 1 : 0;
+}
+
+void CPU_set_flag(CPU* cpu, enum CPU_FLAGS f, bool v) {
+    if (v)
+        cpu->status |= f;
+    else
+        cpu->status &= ~f;
+}
+
+/* external event function */
+
+void CPU_reset(CPU* cpu){
+    cpu->addr_abs = 0xFFFC;
+    uint16_t lo = CPU_read(cpu, cpu->addr_abs + 0);
+    uint16_t hi = CPU_read(cpu, cpu->addr_abs + 1);
+
+    cpu->pc = (hi << 8) | lo;
+
+    /* reset internal registers */
+    cpu->a = 0;
+    cpu->x = 0;
+    cpu->y = 0;
+    cpu->sp = 0xFD;
+    /* status either unused flag enum CPU_flags u */
+    cpu->status = 0x00 | FLAG_UNUSED; 
+
+    cpu->addr_rel = 0x0000;
+    cpu->addr_abs = 0x0000;
+    cpu->fetched = 0x00;
+
+    cpu->cycles = 8;
+}
+
+void CPU_irq(CPU* cpu){
+    if (CPU_get_flag(cpu, FLAG_INTERRUPT) == 0){
+        CPU_write(cpu, 0x0100 + cpu->sp, (cpu->pc >> 8) & 0x00FF);
+        cpu->sp--;
+        CPU_write(cpu, 0x0100 + cpu->sp, cpu->pc & 0x00FF);
+        cpu->sp--;
+
+        CPU_set_flag(cpu, FLAG_BREAK, 0);
+        CPU_set_flag(cpu, FLAG_UNUSED, 1);
+        CPU_set_flag(cpu, FLAG_INTERRUPT, 1);
+        CPU_write(cpu, 0x0100 + cpu->sp, cpu->status);
+        cpu->sp--;
+
+        cpu->addr_abs = 0xFFFE;
+        uint16_t lo = CPU_read(cpu, cpu->addr_abs + 0);
+        uint16_t hi = CPU_read(cpu, cpu->addr_abs + 1);
+        cpu->pc = (hi << 8) | lo;
+
+        cpu->cycles = 7;
+    }
+}
+
+void CPU_nmi(CPU* cpu){
+    CPU_write(cpu, 0x0100 + cpu->sp, (cpu->pc >> 8) & 0x00FF);
+    cpu->sp--;
+    CPU_write(cpu, 0x0100 + cpu->sp, cpu->pc & 0x00FF);
+    cpu->sp--;
+
+    CPU_set_flag(cpu, FLAG_BREAK, 0);
+    CPU_set_flag(cpu, FLAG_UNUSED, 1);
+    CPU_set_flag(cpu, FLAG_INTERRUPT, 1);
+    CPU_write(cpu, 0x0100 + cpu->sp, cpu->status);
+    cpu->sp--;
+
+    cpu->addr_abs = 0xFFFA;
+    uint16_t lo = CPU_read(cpu, cpu->addr_abs + 0);
+    uint16_t hi = CPU_read(cpu, cpu->addr_abs + 1);
+    cpu->pc = (hi << 8) | lo;
+
+    cpu->cycles = 8;
+}
+
+void CPU_clock(CPU* cpu){
+    if (cpu->cycles == 0){
+        cpu->opcode = CPU_read(cpu, cpu->pc);
+        CPU_set_flag(cpu, FLAG_UNUSED, 1);
+        cpu->pc++;
+
+        cpu->cycles = cpu->lookup_table[cpu->opcode].instruction_cycles;
+
+        uint8_t additional_cycle1 = cpu->lookup_table[cpu->opcode].addrmode(cpu);
+        uint8_t additional_cycle2 = cpu->lookup_table[cpu->opcode].operate(cpu);
+
+        cpu->cycles += (additional_cycle1 & additional_cycle2);
+        CPU_set_flag(cpu, FLAG_UNUSED, 1);
+    }
+    cpu->clock_count++;
+    cpu->cycles--;
+}
+
+bool CPU_complete(CPU* cpu){
+    return cpu->cycles == 0;
 }

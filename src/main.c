@@ -4,10 +4,11 @@
 int main()
 {
     Bus* bus = Bus_init();
-    CPU_write(bus->cpu, 0x00FF, 0x62);
-    uint8_t value = CPU_read(bus->cpu, 0x00FF);
-    printf("Value at 0x00FF: 0x%02X\n", value);
-    CPU_destroy(&bus->cpu);
+    CPU* cpu = bus->cpu;
+    CPU_write(cpu, 0x0000, 0x00);
+    CPU_write(cpu, 0x0001, 0x01);
+    CPU_write(cpu, 0x0002, 0x02);
+
     Bus_destroy(&bus);
     return 0;
 }

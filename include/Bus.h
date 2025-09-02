@@ -1,9 +1,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include "debug_printf.h"
 
 #ifndef BUS_H
 #define BUS_H
+
 
 typedef struct CPU CPU;
 

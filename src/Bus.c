@@ -8,7 +8,7 @@ void CPU_destroy(CPU** cpu);
 
 Bus* Bus_init() {
     Bus* bus = malloc(sizeof(Bus));
-    printf("Bus initialized\n");
+    debug_printf("Bus initialized;");
     bus->cpu = CPU_init(bus);
     CPU_connect_Bus(bus->cpu, bus);
     return bus;
@@ -16,11 +16,11 @@ Bus* Bus_init() {
 
 void Bus_destroy(Bus** bus){
     if (bus && *bus) {
+        CPU_destroy(&((*bus)->cpu));
         free(*bus);
         *bus = NULL;
-        printf("Bus destroyed\n");
+        debug_printf("Bus destroyed\n");
     }
-    CPU_destroy(&((*bus)->cpu));
 }
 
 void Bus_write(Bus* bus, uint16_t addr, uint8_t data){

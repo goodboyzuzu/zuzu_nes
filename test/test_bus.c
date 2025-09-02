@@ -1,15 +1,6 @@
 #include "test_bus.h"
 
-static Bus* bus = NULL;
-
-void bus_global_setup(void) {
-    bus = Bus_init();
-}
-
-void bus_global_teardown(void) {
-    Bus_destroy(&bus);
-}
-
+extern Bus* bus;
 
 void test_Bus_initial_state(void) {
     TEST_ASSERT_EACH_EQUAL_UINT8(0, bus->ram, 2048);
@@ -25,9 +16,7 @@ void test_Bus_write_and_read_ram(void) {
 
 
 /* test runner interface */
-void test_bus_run_all_tests(void) {
-    bus_global_setup();
+void test_Bus_run_all_tests(void) {
     RUN_TEST(test_Bus_initial_state);
     RUN_TEST(test_Bus_write_and_read_ram);
-    bus_global_teardown();
 }

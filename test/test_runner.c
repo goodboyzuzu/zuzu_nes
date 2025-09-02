@@ -4,14 +4,22 @@
 #include "test_bus.h"
 #include "test_cpu.h"
 
-void setUp(void){};
-void tearDown(void){};
+Bus* bus = NULL;
+CPU* cpu = NULL;
+
+void setUp(void){
+    bus = Bus_init();
+    cpu = bus->cpu;
+};
+void tearDown(void){
+    Bus_destroy(&bus);
+};
 
 int main(void) {
     UNITY_BEGIN();
 
-    test_bus_run_all_tests();
-    /* test_cpu_run_all_tests(); */
+    test_Bus_run_all_tests();
+    test_CPU_run_all_tests();
 
     return UNITY_END();
 }

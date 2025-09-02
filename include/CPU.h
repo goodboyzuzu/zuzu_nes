@@ -34,9 +34,8 @@ typedef struct INSTRUCTION{
     const char * name;
     uint8_t (*operate)(CPU* cpu);
     uint8_t (*addrmode)(CPU* cpu);
-    uint8_t cycles;
+    uint8_t instruction_cycles;
 } INSTRUCTION;
-
 extern INSTRUCTION lookup[];
 
 CPU* CPU_init();
@@ -60,21 +59,21 @@ int CPU_disassemble(CPU* cpu, uint16_t start, uint16_t end);
 
 enum CPU_FLAGS
 {
-    c = (1 << 0),	/*carry bit*/
-    z = (1 << 1),	/*zero*/
-    i = (1 << 2),	/*disable interrupts*/
-    d = (1 << 3),	/*decimal mode (unused in this implementation)*/
-    b = (1 << 4),	/*break*/
-    u = (1 << 5),	/*unused*/
-    v = (1 << 6),	/*overflow*/
-    n = (1 << 7),	/*negative*/
+    FLAG_CARRY        = (1 << 0), /* Carry Bit */
+    FLAG_ZERO         = (1 << 1), /* Zero */
+    FLAG_INTERRUPT    = (1 << 2), /* Disable Interrupts */
+    FLAG_DECIMAL      = (1 << 3), /* Decimal Mode (unused in this implementation) */
+    FLAG_BREAK        = (1 << 4), /* Break */
+    FLAG_UNUSED       = (1 << 5), /* Unused */
+    FLAG_OVERFLOW     = (1 << 6), /* Overflow */
+    FLAG_NEGATIVE     = (1 << 7)  /* Negative */
 };
 
-uint8_t GetFlag(CPU* cpu, enum CPU_FLAGS f);
-void SetFlag(CPU* cpu, enum CPU_FLAGS f, bool v);
+bool CPU_get_flag(CPU* cpu, enum CPU_FLAGS f);
+void CPU_set_flag(CPU* cpu, enum CPU_FLAGS f, bool v);
 
 /* opcodes */
-uint8_t ADC(CPU* cpu);	/* uint8_t AND(CPU* cpu);	uint8_t ASL(CPU* cpu);	uint8_t BCC(CPU* cpu);
+uint8_t ADC(CPU* cpu);	 uint8_t AND(CPU* cpu);	uint8_t ASL(CPU* cpu);	uint8_t BCC(CPU* cpu);
 uint8_t BCS(CPU* cpu);	uint8_t BEQ(CPU* cpu);	uint8_t BIT(CPU* cpu);	uint8_t BMI(CPU* cpu);
 uint8_t BNE(CPU* cpu);	uint8_t BPL(CPU* cpu);	uint8_t BRK(CPU* cpu);	uint8_t BVC(CPU* cpu);
 uint8_t BVS(CPU* cpu);	uint8_t CLC(CPU* cpu);	uint8_t CLD(CPU* cpu);	uint8_t CLI(CPU* cpu);
@@ -88,13 +87,13 @@ uint8_t ROR(CPU* cpu);	uint8_t RTI(CPU* cpu);	uint8_t RTS(CPU* cpu);	uint8_t SBC
 uint8_t SEC(CPU* cpu);	uint8_t SED(CPU* cpu);	uint8_t SEI(CPU* cpu);	uint8_t STA(CPU* cpu);
 uint8_t STX(CPU* cpu);	uint8_t STY(CPU* cpu);	uint8_t TAX(CPU* cpu);	uint8_t TAY(CPU* cpu);
 uint8_t TSX(CPU* cpu);	uint8_t TXA(CPU* cpu);	uint8_t TXS(CPU* cpu);	uint8_t TYA(CPU* cpu);
- */
+
 /* addressing */
-uint8_t IMP(CPU* cpu);	/* uint8_t IMM(CPU* cpu);	
+uint8_t IMP(CPU* cpu);	uint8_t IMM(CPU* cpu);	
 uint8_t ZP0(CPU* cpu);	uint8_t ZPX(CPU* cpu);	
 uint8_t ZPY(CPU* cpu);	uint8_t REL(CPU* cpu);
 uint8_t ABS(CPU* cpu);	uint8_t ABX(CPU* cpu);	
 uint8_t ABY(CPU* cpu);	uint8_t IND(CPU* cpu);	
 uint8_t IZX(CPU* cpu);	uint8_t IZY(CPU* cpu);
- */
+
 #endif /* CPU_H */

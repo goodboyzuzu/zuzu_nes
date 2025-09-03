@@ -2,17 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-uint8_t ADC(CPU* cpu) {
-    cpu->a += 1; 
-    return 2; 
-}
-
-uint8_t IMP(CPU* cpu) {
-    return 0; 
-}
-
-static const INSTRUCTION instruction_set[] = {{"zuzu_instruction",&ADC,&IMP,2}};
-/* static const INSTRUCTION instruction_set[] = {
+ static const INSTRUCTION instruction_set[] = {
         { "BRK", &BRK, &IMM, 7 },{ "ORA", &ORA, &IZX, 6 },{ "???", &XXX, &IMP, 2 },{ "???", &XXX, &IMP, 8 },{ "???", &NOP, &IMP, 3 },{ "ORA", &ORA, &ZP0, 3 },{ "ASL", &ASL, &ZP0, 5 },{ "???", &XXX, &IMP, 5 },{ "PHP", &PHP, &IMP, 3 },{ "ORA", &ORA, &IMM, 2 },{ "ASL", &ASL, &IMP, 2 },{ "???", &XXX, &IMP, 2 },{ "???", &NOP, &IMP, 4 },{ "ORA", &ORA, &ABS, 4 },{ "ASL", &ASL, &ABS, 6 },{ "???", &XXX, &IMP, 6 },
 		{ "BPL", &BPL, &REL, 2 },{ "ORA", &ORA, &IZY, 5 },{ "???", &XXX, &IMP, 2 },{ "???", &XXX, &IMP, 8 },{ "???", &NOP, &IMP, 4 },{ "ORA", &ORA, &ZPX, 4 },{ "ASL", &ASL, &ZPX, 6 },{ "???", &XXX, &IMP, 6 },{ "CLC", &CLC, &IMP, 2 },{ "ORA", &ORA, &ABY, 4 },{ "???", &NOP, &IMP, 2 },{ "???", &XXX, &IMP, 7 },{ "???", &NOP, &IMP, 4 },{ "ORA", &ORA, &ABX, 4 },{ "ASL", &ASL, &ABX, 7 },{ "???", &XXX, &IMP, 7 },
 		{ "JSR", &JSR, &ABS, 6 },{ "AND", &AND, &IZX, 6 },{ "???", &XXX, &IMP, 2 },{ "???", &XXX, &IMP, 8 },{ "BIT", &BIT, &ZP0, 3 },{ "AND", &AND, &ZP0, 3 },{ "ROL", &ROL, &ZP0, 5 },{ "???", &XXX, &IMP, 5 },{ "PLP", &PLP, &IMP, 4 },{ "AND", &AND, &IMM, 2 },{ "ROL", &ROL, &IMP, 2 },{ "???", &XXX, &IMP, 2 },{ "BIT", &BIT, &ABS, 4 },{ "AND", &AND, &ABS, 4 },{ "ROL", &ROL, &ABS, 6 },{ "???", &XXX, &IMP, 6 },
@@ -29,7 +19,7 @@ static const INSTRUCTION instruction_set[] = {{"zuzu_instruction",&ADC,&IMP,2}};
 		{ "BNE", &BNE, &REL, 2 },{ "CMP", &CMP, &IZY, 5 },{ "???", &XXX, &IMP, 2 },{ "???", &XXX, &IMP, 8 },{ "???", &NOP, &IMP, 4 },{ "CMP", &CMP, &ZPX, 4 },{ "DEC", &DEC, &ZPX, 6 },{ "???", &XXX, &IMP, 6 },{ "CLD", &CLD, &IMP, 2 },{ "CMP", &CMP, &ABY, 4 },{ "NOP", &NOP, &IMP, 2 },{ "???", &XXX, &IMP, 7 },{ "???", &NOP, &IMP, 4 },{ "CMP", &CMP, &ABX, 4 },{ "DEC", &DEC, &ABX, 7 },{ "???", &XXX, &IMP, 7 },
 		{ "CPX", &CPX, &IMM, 2 },{ "SBC", &SBC, &IZX, 6 },{ "???", &NOP, &IMP, 2 },{ "???", &XXX, &IMP, 8 },{ "CPX", &CPX, &ZP0, 3 },{ "SBC", &SBC, &ZP0, 3 },{ "INC", &INC, &ZP0, 5 },{ "???", &XXX, &IMP, 5 },{ "INX", &INX, &IMP, 2 },{ "SBC", &SBC, &IMM, 2 },{ "NOP", &NOP, &IMP, 2 },{ "???", &SBC, &IMP, 2 },{ "CPX", &CPX, &ABS, 4 },{ "SBC", &SBC, &ABS, 4 },{ "INC", &INC, &ABS, 6 },{ "???", &XXX, &IMP, 6 },
 		{ "BEQ", &BEQ, &REL, 2 },{ "SBC", &SBC, &IZY, 5 },{ "???", &XXX, &IMP, 2 },{ "???", &XXX, &IMP, 8 },{ "???", &NOP, &IMP, 4 },{ "SBC", &SBC, &ZPX, 4 },{ "INC", &INC, &ZPX, 6 },{ "???", &XXX, &IMP, 6 },{ "SED", &SED, &IMP, 2 },{ "SBC", &SBC, &ABY, 4 },{ "NOP", &NOP, &IMP, 2 },{ "???", &XXX, &IMP, 7 },{ "???", &NOP, &IMP, 4 },{ "SBC", &SBC, &ABX, 4 },{ "INC", &INC, &ABX, 7 },{ "???", &XXX, &IMP, 7 },
-}; */
+};
 
 CPU* CPU_init(){
     debug_printf("CPU initialized;");
@@ -169,4 +159,185 @@ void CPU_clock(CPU* cpu){
 
 bool CPU_complete(CPU* cpu){
     return cpu->cycles == 0;
+}
+
+/* addressing mode */
+
+/* does nothing, for instruction that does simple stuff */
+uint8_t IMP(CPU* cpu){
+    cpu->fetched = cpu->a;
+    return 0;
+}
+
+/* after storing pc++ to addr_abs, what does it do after? */
+uint8_t IMM(CPU* cpu){
+    cpu->addr_abs = cpu->pc++;
+    return 0;
+}
+
+/* No need load twice as addr x2 of data*/
+uint8_t ZP0(CPU* cpu){
+    cpu->addr_abs = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+    cpu->addr_abs &= 0x00FF;
+    return 0;
+}
+
+/* zero page addressing + x register */
+uint8_t ZPX(CPU* cpu){
+    cpu->addr_abs = (CPU_read(cpu, cpu->pc) + cpu->x) & 0x00FF;
+    cpu->pc++;
+    return 0;
+}
+
+/* zero page addressing + y register */
+uint8_t ZPY(CPU* cpu){
+    cpu->addr_abs = (CPU_read(cpu, cpu->pc) + cpu->y) & 0x00FF;
+    cpu->pc++;
+    return 0;
+}
+
+uint8_t REL(CPU* cpu){
+    cpu->addr_rel = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+    if (cpu->addr_rel & 0x80)
+        cpu->addr_rel |= 0xFF00;
+    return 0;
+}
+
+uint8_t ABS(CPU* cpu){
+    uint16_t lo = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+    uint16_t hi = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+
+    cpu->addr_abs = (hi << 8) | lo;
+    return 0;
+}
+
+uint8_t ABX(CPU* cpu){
+    uint16_t lo = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+    uint16_t hi = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+
+    cpu->addr_abs = ((hi << 8) | lo) + cpu->x;
+
+    if ((cpu->addr_abs & 0xFF00) != (hi << 8))
+        return 1;
+    else
+        return 0;
+}
+
+uint8_t ABY(CPU* cpu){
+    uint16_t lo = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+    uint16_t hi = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+
+    cpu->addr_abs = ((hi << 8) | lo) + cpu->y;
+
+    if ((cpu->addr_abs & 0xFF00) != (hi << 8))
+        return 1;
+    else
+        return 0;
+}
+
+/* indirect: read from ptr addr, if lower byte of ptr addr is 0xff, then top page stays the same. Bug */
+uint8_t IND(CPU* cpu){
+    uint16_t ptr_lo = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+    uint16_t ptr_hi = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+
+    uint16_t ptr = (ptr_hi << 8) | ptr_lo;
+
+    if (ptr_lo == 0x00FF){ /* Simulate page boundary hardware bug */
+        cpu->addr_abs = (CPU_read(cpu, ptr & 0xFF00) << 8) | CPU_read(cpu, ptr + 0);
+    }
+    else{
+        cpu->addr_abs = (CPU_read(cpu, ptr + 1) << 8) | CPU_read(cpu, ptr + 0);
+    }
+    return 0;
+}
+
+/* indirect + x register */
+uint8_t IZX(CPU* cpu){
+    uint16_t t = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+
+    uint16_t lo = CPU_read(cpu, (t + (uint16_t)cpu->x) & 0x00FF);
+    uint16_t hi = CPU_read(cpu, (t + (uint16_t)cpu->x + 1) & 0x00FF);
+
+    cpu->addr_abs = (hi << 8) | lo;
+    return 0;
+}
+
+/* indexes location in page 0x00 */
+uint8_t IZY(CPU* cpu){
+    uint16_t t = CPU_read(cpu, cpu->pc);
+    cpu->pc++;
+
+    uint16_t lo = CPU_read(cpu, t & 0x00FF);
+    uint16_t hi = CPU_read(cpu, (t + 1) & 0x00FF);
+
+    cpu->addr_abs = ((hi << 8) | lo) + cpu->y;
+
+    if ((cpu->addr_abs & 0xFF00) != (hi << 8))
+        return 1;
+    else
+        return 0;
+}
+
+/* instruction */
+
+/* illegal opcode */
+uint8_t XXX(CPU* cpu){
+    return 0;
+}
+
+uint8_t ADC(CPU* cpu){
+    fetch(cpu);
+    uint16_t temp = (uint16_t)cpu->a + (uint16_t)cpu->fetched + (uint16_t)CPU_get_flag(cpu, FLAG_CARRY);
+    CPU_set_flag(cpu, FLAG_CARRY, temp > 255);
+    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0);
+    CPU_set_flag(cpu, FLAG_OVERFLOW, (~((uint16_t)cpu->a ^ (uint16_t)cpu->fetched) & ((uint16_t)cpu->a ^ (uint16_t)temp)) & 0x0080);
+    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x80);
+    cpu->a = temp & 0x00FF;
+    return 1;
+}
+
+uint8_t SBC(CPU* cpu){
+    fetch(cpu);
+    uint16_t value = ((uint16_t)cpu->fetched) ^ 0x00FF;
+    uint16_t temp = (uint16_t)cpu->a + value + (uint16_t)CPU_get_flag(cpu, FLAG_CARRY);
+    CPU_set_flag(cpu, FLAG_CARRY, temp & 0xFF00);
+    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0);
+    CPU_set_flag(cpu, FLAG_OVERFLOW, (temp ^ (uint16_t)cpu->a) & (temp ^ value) & 0x0080);
+    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x80);
+    cpu->a = temp & 0x00FF;
+    return 1;
+}
+
+uint8_t AND(CPU* cpu){
+    fetch(cpu);
+    cpu->a = cpu->a & cpu->fetched;
+    CPU_set_flag(cpu, FLAG_ZERO, cpu->a == 0x00);
+    CPU_set_flag(cpu, FLAG_NEGATIVE, cpu->a & 0x80);
+    return 1;
+}
+
+uint8_t ASL(CPU* cpu){
+    fetch(cpu);
+    uint16_t temp = (uint16_t)cpu->fetched << 1;
+    CPU_set_flag(cpu, FLAG_CARRY, (temp & 0xFF00) > 0);
+    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x00);
+    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x80);
+    if (cpu->lookup_table[cpu->opcode].addrmode == &IMP){
+        cpu->a = temp & 0x00FF;
+    }
+    else{
+        CPU_write(cpu, cpu->addr_abs, temp & 0x00FF);
+    }
+    return 0;
 }

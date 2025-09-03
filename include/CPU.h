@@ -88,6 +88,8 @@ uint8_t SEC(CPU* cpu);	uint8_t SED(CPU* cpu);	uint8_t SEI(CPU* cpu);	uint8_t STA
 uint8_t STX(CPU* cpu);	uint8_t STY(CPU* cpu);	uint8_t TAX(CPU* cpu);	uint8_t TAY(CPU* cpu);
 uint8_t TSX(CPU* cpu);	uint8_t TXA(CPU* cpu);	uint8_t TXS(CPU* cpu);	uint8_t TYA(CPU* cpu);
 
+uint8_t XXX();
+
 /* addressing */
 uint8_t IMP(CPU* cpu);	uint8_t IMM(CPU* cpu);	
 uint8_t ZP0(CPU* cpu);	uint8_t ZPX(CPU* cpu);	

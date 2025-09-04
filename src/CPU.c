@@ -341,3 +341,183 @@ uint8_t ASL(CPU* cpu){
     }
     return 0;
 }
+
+/* branch if carry clear */
+uint8_t BCC(CPU* cpu){
+    if (CPU_get_flag(cpu, FLAG_CARRY) == 0){
+        cpu->cycles++;
+        cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+            cpu->cycles++;
+
+        cpu->pc = cpu->addr_abs;
+    }
+    return 0;
+}
+
+/* branch if carry set */
+uint8_t BCS(CPU* cpu){
+    if (CPU_get_flag(cpu, FLAG_CARRY) == 1){
+        cpu->cycles++;
+        cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+            cpu->cycles++;
+
+        cpu->pc = cpu->addr_abs;
+    }
+    return 0;
+}
+
+/* branch if equal */
+uint8_t BEQ(CPU* cpu){
+    if (CPU_get_flag(cpu, FLAG_ZERO) == 1){
+        cpu->cycles++;
+        cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+            cpu->cycles++;
+
+        cpu->pc = cpu->addr_abs;
+    }
+    return 0;
+}
+
+/* bit test */
+uint8_t BIT(CPU* cpu){
+    fetch(cpu);
+    uint8_t temp = cpu->a & cpu->fetched;
+    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x00);
+    CPU_set_flag(cpu, FLAG_OVERFLOW, cpu->fetched & 0x40);
+    CPU_set_flag(cpu, FLAG_NEGATIVE, cpu->fetched & 0x80);
+    return 0;
+}
+
+/* branch if negative */
+uint8_t BMI(CPU* cpu){
+    if (CPU_get_flag(cpu, FLAG_NEGATIVE) == 1){
+        cpu->cycles++;
+        cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+            cpu->cycles++;
+
+        cpu->pc = cpu->addr_abs;
+    }
+    return 0;
+}
+
+/* branch if not equal */
+uint8_t BNE(CPU* cpu){
+    if (CPU_get_flag(cpu, FLAG_ZERO) == 0){
+        cpu->cycles++;
+        cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+            cpu->cycles++;
+
+        cpu->pc = cpu->addr_abs;
+    }
+    return 0;
+}
+
+/* branch if positive */
+uint8_t BPL(CPU* cpu){
+    if (CPU_get_flag(cpu, FLAG_NEGATIVE) == 0){
+        cpu->cycles++;
+        cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+            cpu->cycles++;
+
+        cpu->pc = cpu->addr_abs;
+    }
+    return 0;
+}
+
+/* break */
+uint8_t BRK(CPU* cpu){
+    cpu->pc++;
+
+    CPU_set_flag(cpu, FLAG_INTERRUPT, 1);
+    CPU_write(cpu, 0x0100 + cpu->sp, (cpu->pc >> 8) & 0x00FF);
+    cpu->sp--;
+    CPU_write(cpu, 0x0100 + cpu->sp, cpu->pc & 0x00FF);
+    cpu->sp--;
+
+    CPU_set_flag(cpu, FLAG_BREAK, 1);
+    CPU_set_flag(cpu, FLAG_UNUSED, 1);
+    CPU_write(cpu, 0x0100 + cpu->sp, cpu->status);
+    cpu->sp--;
+
+    cpu->addr_abs = 0xFFFE;
+    uint16_t lo = CPU_read(cpu, cpu->addr_abs + 0);
+    uint16_t hi = CPU_read(cpu, cpu->addr_abs + 1);
+    cpu->pc = (hi << 8) | lo;
+    return 0;
+}
+
+uint8_t BVC(CPU* cpu){
+    if (CPU_get_flag(cpu, FLAG_OVERFLOW) == 0){
+        cpu->cycles++;
+        cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+            cpu->cycles++;
+
+        cpu->pc = cpu->addr_abs;
+    }
+    return 0;
+}
+
+uint8_t BVS(CPU* cpu){
+    if (CPU_get_flag(cpu, FLAG_OVERFLOW) == 1){
+        cpu->cycles++;
+        cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+            cpu->cycles++;
+
+        cpu->pc = cpu->addr_abs;
+    }
+    return 0;
+}
+
+uint8_t CLC(CPU* cpu){
+    CPU_set_flag(cpu, FLAG_CARRY, 0);
+    return 0;
+}
+
+uint8_t CLD(CPU* cpu){
+    CPU_set_flag(cpu, FLAG_DECIMAL, 0);
+    return 0;
+}
+
+uint8_t CLI(CPU* cpu){
+    CPU_set_flag(cpu, FLAG_INTERRUPT, 0);
+    return 0;
+}
+
+uint8_t CLV(CPU* cpu){
+    CPU_set_flag(cpu, FLAG_OVERFLOW, 0);
+    return 0;
+}
+
+uint8_t CMP(CPU* cpu){
+    fetch(cpu);
+    uint16_t temp = (uint16_t)cpu->a - (uint16_t)cpu->fetched;
+    CPU_set_flag(cpu, FLAG_CARRY, cpu->a >= cpu->fetched);
+    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x0000);
+    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x0080);
+    return 1;
+}
+
+uint8_t CPX(CPU* cpu){
+    fetch(cpu);
+    uint16_t temp = (uint16_t)cpu->x - (uint16_t)cpu->fetched;
+    CPU_set_flag(cpu, FLAG_CARRY, cpu->x >= cpu->fetched);
+    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x0000);
+    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x0080);
+    return 1;
+}

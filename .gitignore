@@ -7,6 +7,7 @@ Makefile
 
 # VS Code settings and workspace files
 .vscode/
+.idea/
 
 # Compiled binaries and object files
 *.o

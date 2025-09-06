@@ -1,10 +1,10 @@
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include "Bus.h"
 
 #ifndef CPU_H
 #define CPU_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "Bus.h"
 
 /* forward declaration for CPU struct. As instruction struct uses CPU pointer () */
 typedef struct INSTRUCTION INSTRUCTION;
@@ -97,5 +97,6 @@ uint8_t ZPY(CPU* cpu);	uint8_t REL(CPU* cpu);
 uint8_t ABS(CPU* cpu);	uint8_t ABX(CPU* cpu);	
 uint8_t ABY(CPU* cpu);	uint8_t IND(CPU* cpu);	
 uint8_t IZX(CPU* cpu);	uint8_t IZY(CPU* cpu);
+
 
 #endif /* CPU_H */

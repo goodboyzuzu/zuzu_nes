@@ -52,481 +52,315 @@ uint8_t CPU_read(CPU* cpu, uint16_t a){
 }
 
 void CPU_write(CPU* cpu, uint16_t a, uint8_t d){
-    Bus_write(cpu->bus, a, d);
+	Bus_write(cpu->bus, a, d);
 }
 
-uint8_t fetch(CPU* cpu){
-    if (!(cpu->lookup_table[cpu->opcode].addrmode == &IMP)){
-        cpu->fetched = CPU_read(cpu, cpu->addr_abs);
-    }
-    return cpu->fetched;
-}
 
 bool CPU_get_flag(CPU* cpu, enum CPU_FLAGS f) {
-    return ((cpu->status & f) > 0) ? 1 : 0;
+	return ((cpu->status & f) > 0) ? 1 : 0;
 }
 
 void CPU_set_flag(CPU* cpu, enum CPU_FLAGS f, bool v) {
-    if (v)
-        cpu->status |= f;
-    else
-        cpu->status &= ~f;
+	if (v)
+		cpu->status |= f;
+	else
+		cpu->status &= ~f;
 }
 
-/* external event function */
 
-void CPU_reset(CPU* cpu){
-    cpu->addr_abs = 0xFFFC;
-    uint16_t lo = CPU_read(cpu, cpu->addr_abs + 0);
-    uint16_t hi = CPU_read(cpu, cpu->addr_abs + 1);
-
-    cpu->pc = (hi << 8) | lo;
-
-    /* reset internal registers */
-    cpu->a = 0;
-    cpu->x = 0;
-    cpu->y = 0;
-    cpu->sp = 0xFD;
-    /* status either unused flag enum CPU_flags u */
-    cpu->status = 0x00 | FLAG_UNUSED; 
-
-    cpu->addr_rel = 0x0000;
-    cpu->addr_abs = 0x0000;
-    cpu->fetched = 0x00;
-
-    cpu->cycles = 8;
+uint8_t fetch(CPU* cpu) {
+	if (!(cpu->lookup_table[cpu->opcode].addrmode == &IMP))
+		cpu->fetched = CPU_read(cpu, cpu->addr_abs);
+	return cpu->fetched;
 }
 
-void CPU_irq(CPU* cpu){
-    if (CPU_get_flag(cpu, FLAG_INTERRUPT) == 0){
-        CPU_write(cpu, 0x0100 + cpu->sp, (cpu->pc >> 8) & 0x00FF);
-        cpu->sp--;
-        CPU_write(cpu, 0x0100 + cpu->sp, cpu->pc & 0x00FF);
-        cpu->sp--;
+/*
+ * external event functions
+ */
 
-        CPU_set_flag(cpu, FLAG_BREAK, 0);
-        CPU_set_flag(cpu, FLAG_UNUSED, 1);
-        CPU_set_flag(cpu, FLAG_INTERRUPT, 1);
-        CPU_write(cpu, 0x0100 + cpu->sp, cpu->status);
-        cpu->sp--;
-
-        cpu->addr_abs = 0xFFFE;
-        uint16_t lo = CPU_read(cpu, cpu->addr_abs + 0);
-        uint16_t hi = CPU_read(cpu, cpu->addr_abs + 1);
-        cpu->pc = (hi << 8) | lo;
-
-        cpu->cycles = 7;
-    }
+void CPU_reset(CPU *cpu) {
+	/* reset goes to known address stored in addr_abs*/
+	cpu->addr_abs = 0xFFFC;
+	const uint16_t lo = CPU_read(cpu, cpu->addr_abs + 0);
+	const uint16_t hi = CPU_read(cpu, cpu->addr_abs + 1);
+	cpu->pc = (hi<<8) | lo;
+	/*clear internal registers*/
+	cpu->a = 0; cpu->x = 0; cpu->y = 0; cpu->sp = 0xFD; cpu->status = 0x00 | FLAG_UNUSED;
+	/* clear helper functions*/
+	cpu->addr_rel = 0x0000; cpu->addr_abs = 0x0000; cpu->fetched = 0x00;
+	/* reset takes time */
+	cpu->cycles = 8;
 }
 
-void CPU_nmi(CPU* cpu){
-    CPU_write(cpu, 0x0100 + cpu->sp, (cpu->pc >> 8) & 0x00FF);
-    cpu->sp--;
-    CPU_write(cpu, 0x0100 + cpu->sp, cpu->pc & 0x00FF);
-    cpu->sp--;
+void CPU_irq(CPU *cpu) {
+	/*interrupt request
+	 * happens when interupt disable flag is 0
+	 * set flag for interrupt disable=1 and break=0
+	 * complete current instruction, then push pc and status to stack
+	 * set pc to address stored at 0xFFFE (low byte) and 0xFFFF (high byte)
+	 */
+	if (CPU_get_flag(cpu, FLAG_INTERRUPT) == 0) {
+		/* push pc to stack pointer*/
+		CPU_write(cpu, 0x0100 + cpu->sp, (cpu->pc >> 8) & 0x00FF);
+		cpu->sp--;
+		CPU_write(cpu, 0x0100 + cpu->sp, (cpu->pc) & 0x00FF);
+		cpu->sp--;
 
-    CPU_set_flag(cpu, FLAG_BREAK, 0);
-    CPU_set_flag(cpu, FLAG_UNUSED, 1);
-    CPU_set_flag(cpu, FLAG_INTERRUPT, 1);
-    CPU_write(cpu, 0x0100 + cpu->sp, cpu->status);
-    cpu->sp--;
+		/* set break=0, unused=1, interrupt=1 */
+		CPU_set_flag(cpu, FLAG_BREAK, 0); CPU_set_flag(cpu, FLAG_UNUSED, 1); CPU_set_flag(cpu, FLAG_INTERRUPT, 1);
+		/* write status to stack pointer */
+		CPU_write(cpu, 0x0100 + cpu->sp, cpu->status);
+		cpu->sp--;
 
-    cpu->addr_abs = 0xFFFA;
-    uint16_t lo = CPU_read(cpu, cpu->addr_abs + 0);
-    uint16_t hi = CPU_read(cpu, cpu->addr_abs + 1);
-    cpu->pc = (hi << 8) | lo;
+		/* change pc from 0xfffe*/
+		cpu->addr_abs = 0xFFFE;
+		uint16_t lo = CPU_read(cpu, cpu->addr_abs+0);
+		uint16_t hi = CPU_read(cpu, cpu->addr_abs+1);
+		cpu->pc = hi<<8 | lo;
+		cpu->cycles = 7;
+	}
 
-    cpu->cycles = 8;
 }
 
-void CPU_clock(CPU* cpu){
-    if (cpu->cycles == 0){
-        cpu->opcode = CPU_read(cpu, cpu->pc);
-        CPU_set_flag(cpu, FLAG_UNUSED, 1);
-        cpu->pc++;
+void CPU_nmi(CPU *cpu) {
+	/*
+	 * Non-maskable interrupt cannot be ignored, same as IRQ
+	 * Read PC address from 0xFFFA
+	 */
+	CPU_write(cpu, 0x0100 + cpu->sp, (cpu->pc >> 8) & 0x00FF);
+	cpu->sp--;
+	CPU_write(cpu, 0x0100 + cpu->sp, (cpu->pc) & 0x00FF);
+	cpu->sp--;
 
-        cpu->cycles = cpu->lookup_table[cpu->opcode].instruction_cycles;
+	/* set break=0, unused=1, interrupt=1 */
+	CPU_set_flag(cpu, FLAG_BREAK, 0); CPU_set_flag(cpu, FLAG_UNUSED, 1); CPU_set_flag(cpu, FLAG_INTERRUPT, 1);
+	/* write status to stack pointer */
+	CPU_write(cpu, 0x0100 + cpu->sp, cpu->status);
+	cpu->sp--;
 
-        uint8_t additional_cycle1 = cpu->lookup_table[cpu->opcode].addrmode(cpu);
-        uint8_t additional_cycle2 = cpu->lookup_table[cpu->opcode].operate(cpu);
+	/* change pc from 0xfffe*/
+	cpu->addr_abs = 0xFFFA;
+	uint16_t lo = CPU_read(cpu, cpu->addr_abs+0);
+	uint16_t hi = CPU_read(cpu, cpu->addr_abs+1);
+	cpu->pc = hi<<8 | lo;
+	cpu->cycles = 8;
 
-        cpu->cycles += (additional_cycle1 & additional_cycle2);
-        CPU_set_flag(cpu, FLAG_UNUSED, 1);
-    }
-    cpu->clock_count++;
-    cpu->cycles--;
 }
 
-bool CPU_complete(CPU* cpu){
-    return cpu->cycles == 0;
+void CPU_clock(CPU *cpu) {
 }
 
-/* addressing mode */
-
-/* does nothing, for instruction that does simple stuff */
-uint8_t IMP(CPU* cpu){
-    cpu->fetched = cpu->a;
-    return 0;
+bool CPU_complete(CPU *cpu) {
 }
 
-/* after storing pc++ to addr_abs, what does it do after? */
-uint8_t IMM(CPU* cpu){
-    cpu->addr_abs = cpu->pc++;
-    return 0;
+int CPU_disassemble(CPU *cpu, uint16_t start, uint16_t end) {
 }
 
-/* No need load twice as addr x2 of data*/
-uint8_t ZP0(CPU* cpu){
-    cpu->addr_abs = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-    cpu->addr_abs &= 0x00FF;
-    return 0;
+uint8_t ADC(CPU *cpu) {
 }
 
-/* zero page addressing + x register */
-uint8_t ZPX(CPU* cpu){
-    cpu->addr_abs = (CPU_read(cpu, cpu->pc) + cpu->x) & 0x00FF;
-    cpu->pc++;
-    return 0;
+uint8_t AND(CPU *cpu) {
 }
 
-/* zero page addressing + y register */
-uint8_t ZPY(CPU* cpu){
-    cpu->addr_abs = (CPU_read(cpu, cpu->pc) + cpu->y) & 0x00FF;
-    cpu->pc++;
-    return 0;
+uint8_t ASL(CPU *cpu) {
 }
 
-uint8_t REL(CPU* cpu){
-    cpu->addr_rel = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-    if (cpu->addr_rel & 0x80)
-        cpu->addr_rel |= 0xFF00;
-    return 0;
+uint8_t BCC(CPU *cpu) {
 }
 
-uint8_t ABS(CPU* cpu){
-    uint16_t lo = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-    uint16_t hi = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-
-    cpu->addr_abs = (hi << 8) | lo;
-    return 0;
+uint8_t BCS(CPU *cpu) {
 }
 
-uint8_t ABX(CPU* cpu){
-    uint16_t lo = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-    uint16_t hi = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-
-    cpu->addr_abs = ((hi << 8) | lo) + cpu->x;
-
-    if ((cpu->addr_abs & 0xFF00) != (hi << 8))
-        return 1;
-    else
-        return 0;
+uint8_t BEQ(CPU *cpu) {
 }
 
-uint8_t ABY(CPU* cpu){
-    uint16_t lo = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-    uint16_t hi = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-
-    cpu->addr_abs = ((hi << 8) | lo) + cpu->y;
-
-    if ((cpu->addr_abs & 0xFF00) != (hi << 8))
-        return 1;
-    else
-        return 0;
+uint8_t BIT(CPU *cpu) {
 }
 
-/* indirect: read from ptr addr, if lower byte of ptr addr is 0xff, then top page stays the same. Bug */
-uint8_t IND(CPU* cpu){
-    uint16_t ptr_lo = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-    uint16_t ptr_hi = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-
-    uint16_t ptr = (ptr_hi << 8) | ptr_lo;
-
-    if (ptr_lo == 0x00FF){ /* Simulate page boundary hardware bug */
-        cpu->addr_abs = (CPU_read(cpu, ptr & 0xFF00) << 8) | CPU_read(cpu, ptr + 0);
-    }
-    else{
-        cpu->addr_abs = (CPU_read(cpu, ptr + 1) << 8) | CPU_read(cpu, ptr + 0);
-    }
-    return 0;
+uint8_t BMI(CPU *cpu) {
 }
 
-/* indirect + x register */
-uint8_t IZX(CPU* cpu){
-    uint16_t t = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-
-    uint16_t lo = CPU_read(cpu, (t + (uint16_t)cpu->x) & 0x00FF);
-    uint16_t hi = CPU_read(cpu, (t + (uint16_t)cpu->x + 1) & 0x00FF);
-
-    cpu->addr_abs = (hi << 8) | lo;
-    return 0;
+uint8_t BNE(CPU *cpu) {
 }
 
-/* indexes location in page 0x00 */
-uint8_t IZY(CPU* cpu){
-    uint16_t t = CPU_read(cpu, cpu->pc);
-    cpu->pc++;
-
-    uint16_t lo = CPU_read(cpu, t & 0x00FF);
-    uint16_t hi = CPU_read(cpu, (t + 1) & 0x00FF);
-
-    cpu->addr_abs = ((hi << 8) | lo) + cpu->y;
-
-    if ((cpu->addr_abs & 0xFF00) != (hi << 8))
-        return 1;
-    else
-        return 0;
+uint8_t BPL(CPU *cpu) {
 }
 
-/* instruction */
-
-/* illegal opcode */
-uint8_t XXX(CPU* cpu){
-    return 0;
+uint8_t BRK(CPU *cpu) {
 }
 
-uint8_t ADC(CPU* cpu){
-    fetch(cpu);
-    uint16_t temp = (uint16_t)cpu->a + (uint16_t)cpu->fetched + (uint16_t)CPU_get_flag(cpu, FLAG_CARRY);
-    CPU_set_flag(cpu, FLAG_CARRY, temp > 255);
-    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0);
-    CPU_set_flag(cpu, FLAG_OVERFLOW, (~((uint16_t)cpu->a ^ (uint16_t)cpu->fetched) & ((uint16_t)cpu->a ^ (uint16_t)temp)) & 0x0080);
-    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x80);
-    cpu->a = temp & 0x00FF;
-    return 1;
+uint8_t BVC(CPU *cpu) {
 }
 
-uint8_t SBC(CPU* cpu){
-    fetch(cpu);
-    uint16_t value = ((uint16_t)cpu->fetched) ^ 0x00FF;
-    uint16_t temp = (uint16_t)cpu->a + value + (uint16_t)CPU_get_flag(cpu, FLAG_CARRY);
-    CPU_set_flag(cpu, FLAG_CARRY, temp & 0xFF00);
-    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0);
-    CPU_set_flag(cpu, FLAG_OVERFLOW, (temp ^ (uint16_t)cpu->a) & (temp ^ value) & 0x0080);
-    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x80);
-    cpu->a = temp & 0x00FF;
-    return 1;
+uint8_t BVS(CPU *cpu) {
 }
 
-uint8_t AND(CPU* cpu){
-    fetch(cpu);
-    cpu->a = cpu->a & cpu->fetched;
-    CPU_set_flag(cpu, FLAG_ZERO, cpu->a == 0x00);
-    CPU_set_flag(cpu, FLAG_NEGATIVE, cpu->a & 0x80);
-    return 1;
+uint8_t CLC(CPU *cpu) {
 }
 
-uint8_t ASL(CPU* cpu){
-    fetch(cpu);
-    uint16_t temp = (uint16_t)cpu->fetched << 1;
-    CPU_set_flag(cpu, FLAG_CARRY, (temp & 0xFF00) > 0);
-    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x00);
-    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x80);
-    if (cpu->lookup_table[cpu->opcode].addrmode == &IMP){
-        cpu->a = temp & 0x00FF;
-    }
-    else{
-        CPU_write(cpu, cpu->addr_abs, temp & 0x00FF);
-    }
-    return 0;
+uint8_t CLD(CPU *cpu) {
 }
 
-/* branch if carry clear */
-uint8_t BCC(CPU* cpu){
-    if (CPU_get_flag(cpu, FLAG_CARRY) == 0){
-        cpu->cycles++;
-        cpu->addr_abs = cpu->pc + cpu->addr_rel;
-
-        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
-            cpu->cycles++;
-
-        cpu->pc = cpu->addr_abs;
-    }
-    return 0;
+uint8_t CLI(CPU *cpu) {
 }
 
-/* branch if carry set */
-uint8_t BCS(CPU* cpu){
-    if (CPU_get_flag(cpu, FLAG_CARRY) == 1){
-        cpu->cycles++;
-        cpu->addr_abs = cpu->pc + cpu->addr_rel;
-
-        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
-            cpu->cycles++;
-
-        cpu->pc = cpu->addr_abs;
-    }
-    return 0;
+uint8_t CLV(CPU *cpu) {
 }
 
-/* branch if equal */
-uint8_t BEQ(CPU* cpu){
-    if (CPU_get_flag(cpu, FLAG_ZERO) == 1){
-        cpu->cycles++;
-        cpu->addr_abs = cpu->pc + cpu->addr_rel;
-
-        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
-            cpu->cycles++;
-
-        cpu->pc = cpu->addr_abs;
-    }
-    return 0;
+uint8_t CMP(CPU *cpu) {
 }
 
-/* bit test */
-uint8_t BIT(CPU* cpu){
-    fetch(cpu);
-    uint8_t temp = cpu->a & cpu->fetched;
-    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x00);
-    CPU_set_flag(cpu, FLAG_OVERFLOW, cpu->fetched & 0x40);
-    CPU_set_flag(cpu, FLAG_NEGATIVE, cpu->fetched & 0x80);
-    return 0;
+uint8_t CPX(CPU *cpu) {
 }
 
-/* branch if negative */
-uint8_t BMI(CPU* cpu){
-    if (CPU_get_flag(cpu, FLAG_NEGATIVE) == 1){
-        cpu->cycles++;
-        cpu->addr_abs = cpu->pc + cpu->addr_rel;
-
-        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
-            cpu->cycles++;
-
-        cpu->pc = cpu->addr_abs;
-    }
-    return 0;
+uint8_t CPY(CPU *cpu) {
 }
 
-/* branch if not equal */
-uint8_t BNE(CPU* cpu){
-    if (CPU_get_flag(cpu, FLAG_ZERO) == 0){
-        cpu->cycles++;
-        cpu->addr_abs = cpu->pc + cpu->addr_rel;
-
-        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
-            cpu->cycles++;
-
-        cpu->pc = cpu->addr_abs;
-    }
-    return 0;
+uint8_t DEC(CPU *cpu) {
 }
 
-/* branch if positive */
-uint8_t BPL(CPU* cpu){
-    if (CPU_get_flag(cpu, FLAG_NEGATIVE) == 0){
-        cpu->cycles++;
-        cpu->addr_abs = cpu->pc + cpu->addr_rel;
-
-        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
-            cpu->cycles++;
-
-        cpu->pc = cpu->addr_abs;
-    }
-    return 0;
+uint8_t DEX(CPU *cpu) {
 }
 
-/* break */
-uint8_t BRK(CPU* cpu){
-    cpu->pc++;
-
-    CPU_set_flag(cpu, FLAG_INTERRUPT, 1);
-    CPU_write(cpu, 0x0100 + cpu->sp, (cpu->pc >> 8) & 0x00FF);
-    cpu->sp--;
-    CPU_write(cpu, 0x0100 + cpu->sp, cpu->pc & 0x00FF);
-    cpu->sp--;
-
-    CPU_set_flag(cpu, FLAG_BREAK, 1);
-    CPU_set_flag(cpu, FLAG_UNUSED, 1);
-    CPU_write(cpu, 0x0100 + cpu->sp, cpu->status);
-    cpu->sp--;
-
-    cpu->addr_abs = 0xFFFE;
-    uint16_t lo = CPU_read(cpu, cpu->addr_abs + 0);
-    uint16_t hi = CPU_read(cpu, cpu->addr_abs + 1);
-    cpu->pc = (hi << 8) | lo;
-    return 0;
+uint8_t DEY(CPU *cpu) {
 }
 
-uint8_t BVC(CPU* cpu){
-    if (CPU_get_flag(cpu, FLAG_OVERFLOW) == 0){
-        cpu->cycles++;
-        cpu->addr_abs = cpu->pc + cpu->addr_rel;
-
-        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
-            cpu->cycles++;
-
-        cpu->pc = cpu->addr_abs;
-    }
-    return 0;
+uint8_t EOR(CPU *cpu) {
 }
 
-uint8_t BVS(CPU* cpu){
-    if (CPU_get_flag(cpu, FLAG_OVERFLOW) == 1){
-        cpu->cycles++;
-        cpu->addr_abs = cpu->pc + cpu->addr_rel;
-
-        if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
-            cpu->cycles++;
-
-        cpu->pc = cpu->addr_abs;
-    }
-    return 0;
+uint8_t INC(CPU *cpu) {
 }
 
-uint8_t CLC(CPU* cpu){
-    CPU_set_flag(cpu, FLAG_CARRY, 0);
-    return 0;
+uint8_t INX(CPU *cpu) {
 }
 
-uint8_t CLD(CPU* cpu){
-    CPU_set_flag(cpu, FLAG_DECIMAL, 0);
-    return 0;
+uint8_t INY(CPU *cpu) {
 }
 
-uint8_t CLI(CPU* cpu){
-    CPU_set_flag(cpu, FLAG_INTERRUPT, 0);
-    return 0;
+uint8_t JMP(CPU *cpu) {
 }
 
-uint8_t CLV(CPU* cpu){
-    CPU_set_flag(cpu, FLAG_OVERFLOW, 0);
-    return 0;
+uint8_t JSR(CPU *cpu) {
 }
 
-uint8_t CMP(CPU* cpu){
-    fetch(cpu);
-    uint16_t temp = (uint16_t)cpu->a - (uint16_t)cpu->fetched;
-    CPU_set_flag(cpu, FLAG_CARRY, cpu->a >= cpu->fetched);
-    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x0000);
-    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x0080);
-    return 1;
+uint8_t LDA(CPU *cpu) {
 }
 
-uint8_t CPX(CPU* cpu){
-    fetch(cpu);
-    uint16_t temp = (uint16_t)cpu->x - (uint16_t)cpu->fetched;
-    CPU_set_flag(cpu, FLAG_CARRY, cpu->x >= cpu->fetched);
-    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x0000);
-    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x0080);
-    return 1;
+uint8_t LDX(CPU *cpu) {
 }
 
-uint8_t CPY(CPU* cpu){
-    fetch(cpu);
-    uint16_t temp = (uint16_t)cpu->y - (uint16_t)cpu->fetched;
-    CPU_set_flag(cpu, FLAG_CARRY, cpu->y >= cpu->fetched);
-    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x0000);
-    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x0080);
-    return 1;
+uint8_t LDY(CPU *cpu) {
 }
+
+uint8_t LSR(CPU *cpu) {
+}
+
+uint8_t NOP(CPU *cpu) {
+}
+
+uint8_t ORA(CPU *cpu) {
+}
+
+uint8_t PHA(CPU *cpu) {
+}
+
+uint8_t PHP(CPU *cpu) {
+}
+
+uint8_t PLA(CPU *cpu) {
+}
+
+uint8_t PLP(CPU *cpu) {
+}
+
+uint8_t ROL(CPU *cpu) {
+}
+
+uint8_t ROR(CPU *cpu) {
+}
+
+uint8_t RTI(CPU *cpu) {
+}
+
+uint8_t RTS(CPU *cpu) {
+}
+
+uint8_t SBC(CPU *cpu) {
+}
+
+uint8_t SEC(CPU *cpu) {
+}
+
+uint8_t SED(CPU *cpu) {
+}
+
+uint8_t SEI(CPU *cpu) {
+}
+
+uint8_t STA(CPU *cpu) {
+}
+
+uint8_t STX(CPU *cpu) {
+}
+
+uint8_t STY(CPU *cpu) {
+}
+
+uint8_t TAX(CPU *cpu) {
+}
+
+uint8_t TAY(CPU *cpu) {
+}
+
+uint8_t TSX(CPU *cpu) {
+}
+
+uint8_t TXA(CPU *cpu) {
+}
+
+uint8_t TXS(CPU *cpu) {
+}
+
+uint8_t TYA(CPU *cpu) {
+}
+
+uint8_t XXX() {
+}
+
+uint8_t IMP(CPU *cpu) {
+}
+
+uint8_t IMM(CPU *cpu) {
+}
+
+uint8_t ZP0(CPU *cpu) {
+}
+
+uint8_t ZPX(CPU *cpu) {
+}
+
+uint8_t ZPY(CPU *cpu) {
+}
+
+uint8_t REL(CPU *cpu) {
+}
+
+uint8_t ABS(CPU *cpu) {
+}
+
+uint8_t ABX(CPU *cpu) {
+}
+
+uint8_t ABY(CPU *cpu) {
+}
+
+uint8_t IND(CPU *cpu) {
+}
+
+uint8_t IZX(CPU *cpu) {
+}
+
+uint8_t IZY(CPU *cpu) {
+}
+
+

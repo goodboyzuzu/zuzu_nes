@@ -521,3 +521,12 @@ uint8_t CPX(CPU* cpu){
     CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x0080);
     return 1;
 }
+
+uint8_t CPY(CPU* cpu){
+    fetch(cpu);
+    uint16_t temp = (uint16_t)cpu->y - (uint16_t)cpu->fetched;
+    CPU_set_flag(cpu, FLAG_CARRY, cpu->y >= cpu->fetched);
+    CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x0000);
+    CPU_set_flag(cpu, FLAG_NEGATIVE, temp & 0x0080);
+    return 1;
+}

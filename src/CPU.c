@@ -53,6 +53,7 @@ uint8_t CPU_read(CPU* cpu, uint16_t a){
 
 void CPU_write(CPU* cpu, uint16_t a, uint8_t d){
 	Bus_write(cpu->bus, a, d);
+
 }
 
 
@@ -69,7 +70,7 @@ void CPU_set_flag(CPU* cpu, enum CPU_FLAGS f, bool v) {
 
 
 uint8_t fetch(CPU* cpu) {
-	if (!(cpu->lookup_table[cpu->opcode].addrmode == &IMP))
+	if (cpu->lookup_table[cpu->opcode].addrmode != &IMP)
 		cpu->fetched = CPU_read(cpu, cpu->addr_abs);
 	return cpu->fetched;
 }
@@ -148,30 +149,108 @@ void CPU_nmi(CPU *cpu) {
 }
 
 void CPU_clock(CPU *cpu) {
+	if (cpu->cycles == 0) {
+		cpu->opcode = CPU_read(cpu, cpu->pc);
+		CPU_set_flag(cpu, FLAG_UNUSED,1);
+		cpu->pc++;
+		cpu->cycles = cpu->lookup_table[cpu->opcode].instruction_cycles;
+		uint8_t additional_cycle1 = (*cpu->lookup_table[cpu->opcode].addrmode)(cpu);
+		uint8_t additional_cycle2 = (*cpu->lookup_table[cpu->opcode].operate)(cpu);
+		cpu->cycles += additional_cycle1 + additional_cycle2;
+
+	}
+	cpu->clock_count++;
+	cpu->cycles--;
 }
 
 bool CPU_complete(CPU *cpu) {
+	return cpu->cycles == 0;
 }
 
 int CPU_disassemble(CPU *cpu, uint16_t start, uint16_t end) {
+	return 0;
 }
 
 uint8_t ADC(CPU *cpu) {
+	/*
+	 * add with carry in
+	 * overflow: look at MSB. P+P->N, N+N->P
+	 * if A+M->R, overflow: A and M are same & A and R are different
+	 *
+	 */
+	fetch(cpu);
+	cpu->temp = cpu->a + cpu->fetched + CPU_get_flag(cpu,FLAG_CARRY);
+	CPU_set_flag(cpu,FLAG_CARRY,cpu->temp>255);
+	CPU_set_flag(cpu, FLAG_ZERO,cpu->temp == 0);
+	CPU_set_flag(cpu, FLAG_OVERFLOW,~(cpu->a^cpu->fetched) & (cpu->a^cpu->temp) & 0x0080);
+	CPU_set_flag(cpu, FLAG_NEGATIVE,cpu->temp & 0x80);
+	cpu->a = cpu->temp | 0x00FF;
+	return 1;
 }
 
 uint8_t AND(CPU *cpu) {
+	/* bitwise logic and*/
+	fetch(cpu);
+	cpu->a = cpu->a & cpu->fetched;
+	CPU_set_flag(cpu, FLAG_ZERO, cpu->a == 0x00);
+	CPU_set_flag(cpu, FLAG_NEGATIVE, cpu->a & 0x80);
+	return 1;
 }
 
 uint8_t ASL(CPU *cpu) {
+	/*arithmetic shift left. put 0 for empty positions*/
+	fetch(cpu);
+	cpu->temp = (uint16_t)cpu->fetched << 1;
+	CPU_set_flag(cpu, FLAG_CARRY, (cpu->temp & 0xFF00) > 0);
+	CPU_set_flag(cpu, FLAG_ZERO, (cpu->temp & 0x00FF) == 0x00);
+	CPU_set_flag(cpu, FLAG_NEGATIVE, cpu->temp & 0x80);
+	if (cpu->lookup_table[cpu->opcode].addrmode == &IMP)
+		cpu->a = cpu->temp & 0x00FF;
+	else
+		CPU_write(cpu, cpu->addr_abs, cpu->temp & 0x00FF);
+	return 0;
 }
 
 uint8_t BCC(CPU *cpu) {
+	/* branch if carry clear */
+	if (CPU_get_flag(cpu, FLAG_CARRY) == 0) {
+		cpu->cycles++;
+		cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+		if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+			cpu->cycles++;
+
+		cpu->pc = cpu->addr_abs;
+	}
+	return 0;
 }
 
 uint8_t BCS(CPU *cpu) {
+	/* branch if carry set */
+	if (CPU_get_flag(cpu, FLAG_CARRY) == 1) {
+		cpu->cycles++;
+		cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+		if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+			cpu->cycles++;
+
+		cpu->pc = cpu->addr_abs;
+	}
+	return 0;
 }
 
 uint8_t BEQ(CPU *cpu) {
+	/* branch if equal */
+	if (CPU_get_flag(cpu, FLAG_ZERO) == 1) {
+		cpu->cycles++;
+		cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+		if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+			cpu->cycles++;
+
+		cpu->pc = cpu->addr_abs;
+	}
+	return 0;
 }
 
 uint8_t BIT(CPU *cpu) {
@@ -187,6 +266,19 @@ uint8_t BPL(CPU *cpu) {
 }
 
 uint8_t BRK(CPU *cpu) {
+
+	cpu->pc++;
+	CPU_set_flag(cpu,FLAG_INTERRUPT,1); CPU_set_flag(cpu, FLAG_BREAK,1);
+	CPU_write(cpu, 0x0100 + cpu->sp, cpu->pc >> 8 | 0x00FF);
+	cpu->sp--;
+	CPU_write(cpu, 0x0100 + cpu->sp, cpu->pc | 0x00FF);
+	cpu->sp--;
+	CPU_write(cpu, 0x0100 + cpu->sp, cpu->status);
+	cpu->sp--;
+
+	cpu->pc = CPU_read(cpu, 0xFFFE) | CPU_read(cpu, 0xFFFF) << 8;
+
+	return 0;
 }
 
 uint8_t BVC(CPU *cpu) {
@@ -286,6 +378,22 @@ uint8_t RTS(CPU *cpu) {
 }
 
 uint8_t SBC(CPU *cpu) {
+ /*
+ * A = A - M - (1 - C) (subtract with carry)
+ * If C=0, borrow 1 from A, if C=1, no borrow
+ *  -M = ~M + 1
+ *  A = A + ~M + C
+ *  set C if temp | 0xFF00 because 8th bit will be 1 if result is positive
+ */
+	fetch(cpu);
+	uint16_t value = cpu->fetched ^ 0x00FF;
+	cpu->temp = cpu->a + value + CPU_get_flag(cpu,FLAG_CARRY);
+	CPU_set_flag(cpu,FLAG_CARRY,cpu->temp & 0xFF00);
+	CPU_set_flag(cpu, FLAG_ZERO,(cpu->temp & 0x00FF) == 0);
+	CPU_set_flag(cpu, FLAG_OVERFLOW,(cpu->temp ^ cpu->a) & (cpu->temp ^ value) & 0x0080);
+	CPU_set_flag(cpu, FLAG_NEGATIVE,cpu->temp & 0x80);
+	cpu->a = cpu->temp & 0x00FF;
+	return 1;
 }
 
 uint8_t SEC(CPU *cpu) {
@@ -317,7 +425,7 @@ uint8_t TSX(CPU *cpu) {
 
 uint8_t TXA(CPU *cpu) {
 }
-
+/**/
 uint8_t TXS(CPU *cpu) {
 }
 
@@ -331,6 +439,9 @@ uint8_t IMP(CPU *cpu) {
 }
 
 uint8_t IMM(CPU *cpu) {
+	/*next byte as read value*/
+	cpu->addr_abs = cpu->pc++;
+	return 0;
 }
 
 uint8_t ZP0(CPU *cpu) {

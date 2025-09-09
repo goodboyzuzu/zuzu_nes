@@ -24,3 +24,5 @@ add_executable(test_output
 )
 
 target_include_directories(test_output PRIVATE include test)
+enable_testing()
+add_test(NAME test_output COMMAND test_output)

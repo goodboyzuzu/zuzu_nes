@@ -70,6 +70,7 @@ void CPU_set_flag(CPU* cpu, enum CPU_FLAGS f, bool v) {
 
 
 uint8_t fetch(CPU* cpu) {
+	/* fetched: data in addr_abs*/
 	if (cpu->lookup_table[cpu->opcode].addrmode != &IMP)
 		cpu->fetched = CPU_read(cpu, cpu->addr_abs);
 	return cpu->fetched;
@@ -254,9 +255,27 @@ uint8_t BEQ(CPU *cpu) {
 }
 
 uint8_t BIT(CPU *cpu) {
+	/* use fetched to set flags*/
+	cpu->fetched = CPU_read(cpu, cpu->addr_abs);
+	uint8_t temp = cpu->a & cpu->fetched;
+	CPU_set_flag(cpu, FLAG_ZERO, (temp & 0x00FF) == 0x00);
+	CPU_set_flag(cpu, FLAG_NEGATIVE, cpu->fetched & 0x80);
+	CPU_set_flag(cpu, FLAG_OVERFLOW, cpu->fetched & 0x40);
+	return 0;
 }
 
 uint8_t BMI(CPU *cpu) {
+	/* branch if negative */
+	if (CPU_get_flag(cpu, FLAG_NEGATIVE) == 1) {
+		cpu->cycles++;
+		cpu->addr_abs = cpu->pc + cpu->addr_rel;
+
+		if ((cpu->addr_abs & 0xFF00) != (cpu->pc & 0xFF00))
+			cpu->cycles++;
+
+		cpu->pc = cpu->addr_abs;
+	}
+	return 0;
 }
 
 uint8_t BNE(CPU *cpu) {
@@ -469,9 +488,20 @@ uint8_t IND(CPU *cpu) {
 }
 
 uint8_t IZX(CPU *cpu) {
+	/* addr_abs = read(pc + x)*/
+	uint16_t t = CPU_read( cpu, cpu->pc);
+	cpu->pc++;
+	uint16_t lo  = CPU_read( cpu, (t + cpu->x +0) & 0x00FF);
+	uint16_t hi = CPU_read(cpu, (t + cpu->x + 1) & 0x00FF);
+	cpu->addr_abs = (hi << 8) | lo;
+	return 0;
 }
 
 uint8_t IZY(CPU *cpu) {
+	/* addr_abs = read(pc) +y*/
+	uint8_t t = CPU_read(cpu, cpu->pc);
+	cpu->pc++;
+	uint16_t lo = CPU_read(cpu, t & 0x00FF);
 }
 
 
